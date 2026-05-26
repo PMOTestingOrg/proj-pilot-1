@@ -12,12 +12,12 @@
 # Save and commit. The dashboard will start aggregating within 5 minutes.
 
 project:
-  slug: REPLACE-ME-WITH-PROJECT-SLUG
+  slug: pilot-1
   # Used as the GitHub label "project:<slug>"
   # Must be kebab-case, short, unique across all PMO projects
   # Examples: portal-redesign, auth-migration, billing-v2
 
-  display_name: "REPLACE ME — Human-Readable Project Name"
+  display_name: "Pilot Project 1"
   # Shown in dashboard headings; can have spaces and capitals
 
 # ─────────────────────────────────────────────────────────────────
@@ -26,8 +26,8 @@ project:
 # Format: owner/repo (matching GitHub URL path)
 # Multiple PMO projects can share a repo (e.g., shared services).
 
-linked_repos: []
-  # Example:
+linked_repos: 
+- PMOTestingOrg/sandbox-backend
   # - your-org/customer-portal-backend
   # - your-org/customer-portal-frontend
   # - your-org/shared-auth-service
