@@ -1,0 +1,94 @@
+# Project Configuration
+# ─────────────────────────────────────────────────────────────────
+# Edit this once per project. Workflows read it on every run.
+# Validator runs daily and alerts if anything is broken (renamed repos, etc).
+#
+# Quick start for new project:
+#   1. Edit `slug` and `display_name` below
+#   2. Edit `linked_repos` to list the code repos this project touches
+#   3. Run the "🔗 Sync labels to linked repos" workflow (one-click setup)
+#   4. Engineering can now apply `project:<slug>` to relevant issues
+#
+# Save and commit. The dashboard will start aggregating within 5 minutes.
+
+project:
+  slug: REPLACE-ME-WITH-PROJECT-SLUG
+  # Used as the GitHub label "project:<slug>"
+  # Must be kebab-case, short, unique across all PMO projects
+  # Examples: portal-redesign, auth-migration, billing-v2
+
+  display_name: "REPLACE ME — Human-Readable Project Name"
+  # Shown in dashboard headings; can have spaces and capitals
+
+# ─────────────────────────────────────────────────────────────────
+# Linked code repositories
+# Engineering work for this project lives in these repos.
+# Format: owner/repo (matching GitHub URL path)
+# Multiple PMO projects can share a repo (e.g., shared services).
+
+linked_repos: []
+  # Example:
+  # - your-org/customer-portal-backend
+  # - your-org/customer-portal-frontend
+  # - your-org/shared-auth-service
+
+# ─────────────────────────────────────────────────────────────────
+# What to surface in the PMO dashboard from code repos.
+# Toggle individual sections on/off.
+
+surfacing:
+  show_engineering_rollup: true
+  # Table of open/closed issues per linked repo, plus last activity time.
+
+  show_needs_pm_queue: true
+  # Issues with both `needs-pm` and `project:<slug>` labels.
+  # Use this for engineering questions/decisions blocked on PM input.
+
+  show_high_severity_bugs: true
+  # Issues with `severity:S1` or `severity:S2` AND `project:<slug>`.
+  # The "bugs needing immediate attention" surface.
+
+  show_sprint_status: true
+  # Current open milestones per linked repo with progress bars.
+
+  show_recent_closures: true
+  # Issues closed in last 7 days with `project:<slug>`.
+  # Quick "what got done this week" view.
+
+# ─────────────────────────────────────────────────────────────────
+# Invoice trigger configuration (optional).
+# Maps GitHub Milestones (which represent invoices) to closure conditions.
+#
+# Trigger types:
+#   - pmo_milestone:   Auto-marks "Ready to invoice" when the PMO milestone itself closes.
+#                      No code repo dependency. Use for charter-driven invoices.
+#   - code_milestone:  Auto-marks "Ready to invoice" when ALL listed code repos have
+#                      closed a milestone with the given name.
+
+invoice_triggers: []
+  # Example:
+  # - milestone: "Invoice 1 — BRD Sign-Off"
+  #   trigger:
+  #     type: pmo_milestone
+  #
+  # - milestone: "Invoice 2 — Sprint 5 Complete"
+  #   trigger:
+  #     type: code_milestone
+  #     repos:
+  #       - your-org/customer-portal-backend
+  #       - your-org/customer-portal-frontend
+  #     milestone_name: "Sprint 5"
+
+# ─────────────────────────────────────────────────────────────────
+# Notification preferences (optional).
+# When the daily audit finds unlabeled issues or the validator finds
+# a broken linked_repo, who should be notified?
+
+notifications:
+  audit_assignees: []
+    # GitHub usernames to assign daily audit report issues to.
+    # Example: [vineeth-pm, alice-engineering-lead]
+
+  validation_assignees: []
+    # GitHub usernames to alert when project-config.yml has problems
+    # (renamed/deleted linked repos, duplicate slug across projects, etc.)

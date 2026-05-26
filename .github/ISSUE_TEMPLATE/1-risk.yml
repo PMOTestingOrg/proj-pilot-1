@@ -1,0 +1,30 @@
+name: "⚠️ Risk"
+description: "Log a project risk"
+title: "⚠️ [RISK] "
+labels: ["type:risk"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        After creating, **add to the Project board** and set Probability/Impact/Owner.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "What's the risk?"
+      description: "Format: IF <condition> THEN <consequence>."
+      placeholder: "IF the vendor API is delayed THEN UAT slips by 2 weeks."
+    validations: { required: true }
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: "Category"
+      options: ["Schedule", "Scope", "Resource", "Technical", "External / Vendor", "Compliance", "Financial", "Quality"]
+    validations: { required: true }
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: "Mitigation plan"
+    validations: { required: true }

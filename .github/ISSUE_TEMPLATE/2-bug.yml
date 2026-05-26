@@ -1,0 +1,30 @@
+name: "🐞 Bug"
+description: "Report a defect"
+title: "🐞 [BUG] "
+labels: ["type:bug"]
+body:
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Severity"
+      options: ["S1 - Blocker", "S2 - Major", "S3 - Minor", "S4 - Trivial"]
+    validations: { required: true }
+
+  - type: dropdown
+    id: found-in
+    attributes:
+      label: "Found during"
+      options: ["Development", "UAT", "Production"]
+    validations: { required: true }
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: "Steps to reproduce"
+    validations: { required: true }
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected vs actual"
+    validations: { required: true }

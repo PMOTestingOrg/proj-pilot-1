@@ -1,0 +1,36 @@
+# Standardized labels - 13 total, each one essential for automation or PM workflow.
+# Every label has a reason - see README "Labels reference" section.
+
+# ─── For top-level structural issues ────────────────────────────
+# `type:phase` identifies the 6 phase parent issues. Used by:
+#   - "Parents only" filter to keep the Issues view clean
+#   - Dashboard workflow to find parents and roll up sub-issue stats
+- { name: "type:phase",    color: "5319E7", description: "Phase parent issue (Initiation, Dev, UAT, etc.)" }
+
+# `type:charter` identifies the single Project Charter issue. Used by PMs to find it fast.
+- { name: "type:charter",  color: "0052CC", description: "The project charter issue" }
+
+# `type:dashboard` is on the auto-generated Project Dashboard. Used as a fallback identifier
+# (primary is title-match) so the dashboard workflow can update the right issue.
+- { name: "type:dashboard", color: "1D76DB", description: "Auto-updating project dashboard issue" }
+
+# ─── For issues PMs create from templates ──────────────────────
+# These distinguish what the issue is about. Used by Quick Views filters on the dashboard.
+- { name: "type:risk",           color: "B60205", description: "Risk register entry" }
+- { name: "type:change-request", color: "F9D0C4", description: "Scope/schedule/budget change request" }
+- { name: "type:bug",            color: "D73A4A", description: "Defect" }
+- { name: "type:status-report",  color: "FBCA04", description: "Weekly status report" }
+
+# ─── For bug triage ─────────────────────────────────────────────
+- { name: "severity:S1", color: "B60205", description: "Blocker - production down" }
+- { name: "severity:S2", color: "D93F0B", description: "Major - significant impact" }
+- { name: "severity:S3", color: "FBCA04", description: "Minor - limited impact" }
+- { name: "severity:S4", color: "C2E0C6", description: "Trivial - cosmetic" }
+
+# ─── For UI cleanliness ─────────────────────────────────────────
+# Without this label, sub-issues show in the main Issues list and clutter the view.
+# The "Parents only" bookmark URL uses `-label:is:sub-task` to filter them out.
+- { name: "is:sub-task",  color: "EEEEEE", description: "Sub-issue under a phase parent. Hidden from Parents-only view." }
+
+# ─── For warning PMs about auto-managed content ────────────────
+- { name: "auto-managed", color: "6A737D", description: "Maintained by automation - don't edit body manually" }

@@ -1,0 +1,39 @@
+name: 🔗 Sync labels to linked repos
+
+# One-click workflow PMs run when they set up a new project or change linked_repos.
+# Creates project:<slug>, project:none, needs-pm, severity:S1..S4 labels
+# in every linked code repo. Idempotent.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      APP_TOKEN: ${{ secrets.APP_TOKEN }}
+      PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fail if no token available
+        if: env.APP_TOKEN == '' && env.PROJECTS_TOKEN == ''
+        run: |
+          echo "::error::Either APP_TOKEN (GitHub App) or PROJECTS_TOKEN (PAT) must be set as a secret."
+          echo "APP_TOKEN preferred — see docs/admin-setup.md."
+          exit 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml --break-system-packages --quiet
+
+      - name: Sync labels
+        run: python3 scripts/sync_labels.py

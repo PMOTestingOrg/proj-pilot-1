@@ -1,0 +1,56 @@
+name: "📊 Weekly Status Report"
+description: "Submit every Friday"
+title: "📊 Status — Week of YYYY-MM-DD"
+labels: ["type:status-report"]
+body:
+  - type: dropdown
+    id: overall-health
+    attributes:
+      label: "🚦 Overall health"
+      options: ["🟢 Green — on track", "🟡 Yellow — at risk", "🔴 Red — off track"]
+    validations: { required: true }
+
+  - type: dropdown
+    id: schedule-health
+    attributes:
+      label: "📅 Schedule"
+      options: ["🟢 Green", "🟡 Yellow", "🔴 Red"]
+    validations: { required: true }
+
+  - type: dropdown
+    id: scope-health
+    attributes:
+      label: "🎯 Scope"
+      options: ["🟢 Green", "🟡 Yellow", "🔴 Red"]
+    validations: { required: true }
+
+  - type: dropdown
+    id: quality-health
+    attributes:
+      label: "✅ Quality"
+      options: ["🟢 Green", "🟡 Yellow", "🔴 Red"]
+    validations: { required: true }
+
+  - type: textarea
+    id: accomplishments
+    attributes:
+      label: "✨ Done this week"
+    validations: { required: true }
+
+  - type: textarea
+    id: next-week
+    attributes:
+      label: "🎯 Plan for next week"
+    validations: { required: true }
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: "🚫 Blockers"
+      value: "None"
+
+  - type: textarea
+    id: asks
+    attributes:
+      label: "🙋 Asks from stakeholders"
+      value: "None"

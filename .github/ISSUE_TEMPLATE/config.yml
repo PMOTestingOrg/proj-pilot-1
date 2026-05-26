@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "📘 PM Quick Reference"
+    url: "../docs/PM-quick-reference.md"
+    about: "How to use the board and Issues tab together."

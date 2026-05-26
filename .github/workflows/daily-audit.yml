@@ -1,0 +1,36 @@
+name: 🔍 Daily audit
+
+# Daily report of unlabeled engineering issues across linked code repos.
+# Posts an issue in this PMO repo with the count and details.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"          # 02:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      APP_TOKEN: ${{ secrets.APP_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml --break-system-packages --quiet
+
+      - name: Run audit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: python3 scripts/audit_unlabeled.py

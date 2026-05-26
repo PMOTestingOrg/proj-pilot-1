@@ -1,0 +1,39 @@
+name: ✅ Validate project-config
+
+# Validates project-config.yml whenever it changes, and once a day to
+# catch drift (renamed/deleted linked repos, etc).
+
+on:
+  push:
+    paths:
+      - "project-config.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"          # 03:00 UTC daily (1h after audit)
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      APP_TOKEN: ${{ secrets.APP_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml --break-system-packages --quiet
+
+      - name: Run validator
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: python3 scripts/validate_config.py

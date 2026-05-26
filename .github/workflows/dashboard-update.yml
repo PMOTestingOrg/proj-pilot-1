@@ -1,0 +1,40 @@
+name: 🔄 Dashboard update
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"          # every 5 minutes (cross-repo polling)
+  workflow_dispatch:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled, milestoned, demilestoned]
+  milestone:
+    types: [created, closed, opened, edited, deleted]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: dashboard-update
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Update dashboard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          pip install pyyaml --break-system-packages --quiet
+          python3 scripts/update_dashboard.py

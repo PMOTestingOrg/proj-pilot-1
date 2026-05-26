@@ -1,0 +1,29 @@
+name: "🔄 Change Request"
+description: "Change to scope, schedule, or budget"
+title: "🔄 [CR] "
+labels: ["type:change-request"]
+body:
+  - type: dropdown
+    id: change-type
+    attributes:
+      label: "What's changing?"
+      options: ["Scope", "Schedule", "Budget", "Resources", "Multiple"]
+    validations: { required: true }
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description"
+    validations: { required: true }
+
+  - type: textarea
+    id: justification
+    attributes:
+      label: "Business justification"
+    validations: { required: true }
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: "Impact (days, $, scope)"
+    validations: { required: true }

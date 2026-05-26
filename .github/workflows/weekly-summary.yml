@@ -1,0 +1,45 @@
+name: 📈 Weekly summary
+
+# Appends one row per week to status-history/timeline.md
+# Runs every Monday at 09:00 UTC.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"           # Monday 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml --break-system-packages --quiet
+
+      - name: Append weekly row
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: python3 scripts/weekly_summary.py
+
+      - name: Commit summary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add status-history/
+            git commit -m "📈 Weekly summary ($(date -u +%Y-W%U))"
+            git push
+          fi
