@@ -211,8 +211,61 @@ def get_phase_parents_with_subissues():
         return {}
 
 
+def get_phase_statuses_from_board(project, phase_data):
+    """Read each phase parent's Status and % Complete from the board.
+    Returns dict: phase_name -> {status, pct_complete}.
+    """
+    if not project:
+        return {}
+    # Build issue_number -> phase_name map from phase_data parents
+    parent_num_to_phase = {}
+    for phase, data in phase_data.items():
+        parent_num_to_phase[data["parent"]["number"]] = phase
+
+    out = {}
+    for item in project["items"]["nodes"]:
+        content = item.get("content") or {}
+        num = content.get("number")
+        if num not in parent_num_to_phase:
+            continue
+        fields = extract_fields(item)
+        phase = parent_num_to_phase[num]
+        out[phase] = {
+            "status": fields.get("Status", ""),
+            "pct_complete": fields.get("% Complete"),
+        }
+    return out
+
+
+def find_current_phases(phase_data, phase_statuses):
+    """Find ALL phases currently In Progress (or all-but-Done open phases).
+    Returns list of phase names in PHASES order.
+    """
+    in_progress = []
+    for phase in PHASES:
+        if phase not in phase_data:
+            continue
+        parent = phase_data[phase]["parent"]
+        # Closed parent = phase done
+        if parent["state"] == "closed":
+            continue
+        # Read board status — if explicitly marked "In Progress", include
+        status = (phase_statuses.get(phase) or {}).get("status", "")
+        if "In Progress" in status or "in progress" in status.lower():
+            in_progress.append(phase)
+    # Fallback: if board statuses aren't set, fall back to the earliest open phase
+    if not in_progress:
+        for phase in PHASES:
+            if phase not in phase_data:
+                continue
+            if phase_data[phase]["parent"]["state"] != "closed":
+                return [phase]
+        return []
+    return in_progress
+
+
 def find_current_phase(phase_data):
-    """The current phase = earliest phase that is not fully complete."""
+    """Legacy single-phase API (kept for pin manager). Returns first in-progress phase."""
     for phase in PHASES:
         if phase not in phase_data:
             continue
@@ -308,32 +361,45 @@ def build_status_overview_v2(project, phase_data):
     return section
 
 
-def build_currently_in_section(phase_data, current_phase):
+def build_currently_in_section(phase_data, current_phases, phase_statuses):
+    """Show all in-progress phases. current_phases is a list."""
     section = "## 📍 Currently In\n\n"
-    if not current_phase:
-        section += "_All phases complete - project ready for closeout._\n"
+    if not current_phases:
+        section += "_All phases complete — project ready for closeout._\n"
         return section
 
-    parent = phase_data[current_phase]["parent"]
-    subs = phase_data[current_phase]["subs"]
-    done = sum(1 for s in subs if s["state"] == "closed")
-    total = len(subs)
+    for phase in current_phases:
+        parent = phase_data[phase]["parent"]
+        subs = phase_data[phase]["subs"]
+        done = sum(1 for s in subs if s["state"] == "closed")
+        total = len(subs)
 
-    section += f"**{current_phase}** — [#{parent['number']}](https://github.com/{REPO}/issues/{parent['number']})\n\n"
-    if total > 0:
-        pct = round(100 * done / total)
-        section += f"- Sub-tasks: {done}/{total} complete ({pct}%)\n"
-    else:
-        section += "- No sub-tasks (work tracked via board fields)\n"
+        # Pull % Complete from board if available
+        board_pct = (phase_statuses.get(phase) or {}).get("pct_complete")
+        board_status = (phase_statuses.get(phase) or {}).get("status", "")
+
+        section += (f"**{phase}** — [#{parent['number']}]"
+                    f"(https://github.com/{REPO}/issues/{parent['number']})\n")
+        if board_status:
+            section += f"- Status: {board_status}\n"
+        if board_pct is not None:
+            section += f"- % Complete (from board): {board_pct}%\n"
+        if total > 0:
+            sub_pct = round(100 * done / total)
+            section += f"- Sub-tasks: {done}/{total} complete ({sub_pct}%)\n"
+        else:
+            section += "- No sub-tasks (work tracked via board fields)\n"
+        section += "\n"
     return section
 
 
-def build_phase_progress_section(phase_data, project):
+def build_phase_progress_section(phase_data, project, phase_statuses):
     section = "## 📊 Phase Progress\n\n"
-    section += "| Phase | Status | Sub-issues | Earliest Planned End |\n|---|---|---|---|\n"
+    section += "| Phase | Status | Progress | Sub-issues | Earliest Planned End |\n"
+    section += "|---|---|---|---|---|\n"
     today = datetime.now(timezone.utc).date()
 
-    # Get earliest planned-end per phase from board
+    # Get earliest planned-end per phase from board (open work only)
     phase_earliest_end = {}
     if project:
         for item in project["items"]["nodes"]:
@@ -353,15 +419,33 @@ def build_phase_progress_section(phase_data, project):
 
     for phase in PHASES:
         if phase not in phase_data:
-            section += f"| {phase} | _missing_ | — | — |\n"
+            section += f"| {phase} | _missing_ | — | — | — |\n"
             continue
         parent = phase_data[phase]["parent"]
         subs = phase_data[phase]["subs"]
         total = len(subs)
         done = sum(1 for s in subs if s["state"] == "closed")
 
+        # Get board fields
+        board_data = phase_statuses.get(phase) or {}
+        board_status = board_data.get("status", "")
+        board_pct = board_data.get("pct_complete")
+
+        # Status: prefer board status when set, else infer from issue state
         if parent["state"] == "closed":
             status_icon = "✅ Done"
+        elif board_status:
+            # Use board status when set
+            if "Done" in board_status:
+                status_icon = "✅ " + board_status
+            elif "In Progress" in board_status:
+                status_icon = "🔄 " + board_status
+            elif "Blocked" in board_status:
+                status_icon = "🚫 " + board_status
+            elif "Not Started" in board_status:
+                status_icon = "⏳ " + board_status
+            else:
+                status_icon = board_status
         elif total == 0:
             status_icon = "⏳ Empty"
         elif done == total:
@@ -371,9 +455,21 @@ def build_phase_progress_section(phase_data, project):
         else:
             status_icon = "⏳ Not Started"
 
-        if total > 0:
+        # Progress: prefer board % Complete when set, else sub-issue ratio
+        if board_pct is not None:
+            try:
+                progress_str = f"{int(board_pct)}%"
+            except (ValueError, TypeError):
+                progress_str = str(board_pct)
+        elif total > 0:
             pct = round(100 * done / total)
-            sub_str = f"{done}/{total} ({pct}%)"
+            progress_str = f"{pct}%"
+        else:
+            progress_str = "—"
+
+        # Sub-issues column
+        if total > 0:
+            sub_str = f"{done}/{total}"
         else:
             sub_str = "—"
 
@@ -387,7 +483,7 @@ def build_phase_progress_section(phase_data, project):
             except Exception:
                 pass
 
-        section += f"| {phase} | {status_icon} | {sub_str} | {end_str}{variance} |\n"
+        section += f"| {phase} | {status_icon} | {progress_str} | {sub_str} | {end_str}{variance} |\n"
     return section
 
 
@@ -596,7 +692,11 @@ def main():
         project = None
 
     phase_data = get_phase_parents_with_subissues()
-    current_phase = find_current_phase(phase_data)
+    # NEW: read board status + % Complete per phase parent
+    phase_statuses = get_phase_statuses_from_board(project, phase_data)
+    current_phases = find_current_phases(phase_data, phase_statuses)
+    # Legacy single-phase value for pin manager
+    current_phase = current_phases[0] if current_phases else None
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     body = "# 📈 Project Dashboard\n\n"
@@ -617,9 +717,9 @@ def main():
     body += f"- 📊 [Weekly Status Reports]({base}?q=is%3Aissue+label%3Atype%3Astatus-report)\n\n"
 
     body += build_health_section(phase_data, milestones, project, issues) + "\n"
-    body += build_currently_in_section(phase_data, current_phase) + "\n"
+    body += build_currently_in_section(phase_data, current_phases, phase_statuses) + "\n"
     body += build_status_overview_v2(project, phase_data) + "\n"
-    body += build_phase_progress_section(phase_data, project) + "\n"
+    body += build_phase_progress_section(phase_data, project, phase_statuses) + "\n"
     body += build_invoice_section(milestones) + "\n"
 
     # ─── Cross-repo sections (if project-config.yml is set up) ───
