@@ -89,12 +89,17 @@ def get_project_label(config):
 
 def query_repo_issues(owner_repo, project_label, additional_labels=None,
                       states=("OPEN",), limit=50):
-    """Query issues in a repo by label(s) + state. Returns list of issues."""
+    """Query issues in a repo by label(s) + state. Returns list of issues.
+
+    Important: GitHub's GraphQL `labels:` filter has OR semantics, not AND.
+    To require ALL labels, we query only by project_label and filter
+    additional_labels client-side.
+    """
     owner, name = owner_repo.split("/", 1)
-    label_filter = [project_label]
-    if additional_labels:
-        label_filter.extend(additional_labels)
     state_filter = list(states)
+
+    # Fetch enough to allow client-side filtering for additional labels
+    fetch_limit = limit if not additional_labels else max(100, limit * 5)
 
     query = """
     query($owner: String!, $name: String!, $labels: [String!]!, $states: [IssueState!]!, $limit: Int!) {
@@ -116,14 +121,31 @@ def query_repo_issues(owner_repo, project_label, additional_labels=None,
     try:
         result = graphql(query, {
             "owner": owner, "name": name,
-            "labels": label_filter, "states": state_filter,
-            "limit": limit,
+            "labels": [project_label],  # query by project label only
+            "states": state_filter,
+            "limit": fetch_limit,
         })
         repo = result.get("repository") or {}
         issues_data = repo.get("issues") or {}
+        items = issues_data.get("nodes") or []
+
+        # Client-side AND filter for additional required labels
+        if additional_labels:
+            required = set(additional_labels)
+            filtered = []
+            for issue in items:
+                issue_labels = {l["name"] for l in (issue.get("labels") or {}).get("nodes", [])}
+                if required.issubset(issue_labels):
+                    filtered.append(issue)
+            items = filtered[:limit]
+            total = len(items)
+        else:
+            total = issues_data.get("totalCount", 0)
+            items = items[:limit]
+
         return {
-            "total": issues_data.get("totalCount", 0),
-            "items": issues_data.get("nodes") or [],
+            "total": total,
+            "items": items,
             "error": None,
         }
     except Exception as exc:
@@ -181,7 +203,8 @@ def build_engineering_rollup_section(config, project_label):
         return ""
 
     section = "## 🔧 Engineering Activity (cross-repo rollup)\n\n"
-    section += "| Repo | Open | Closed (7d) | Last activity |\n"
+    section += f"_Counts include only issues labeled `{project_label}` — issues without the label aren't tracked._\n\n"
+    section += f"| Repo | Open w/ `{project_label}` | Closed last 7d w/ `{project_label}` | Last activity |\n"
     section += "|---|---|---|---|\n"
 
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
@@ -218,7 +241,7 @@ def build_engineering_rollup_section(config, project_label):
 
 
 def build_needs_pm_section(config, project_label):
-    """Issues tagged needs-pm + project label across linked repos."""
+    """Issues tagged needs-pm AND project label across linked repos."""
     linked = config.get("linked_repos") or []
     if not linked:
         return ""
@@ -232,10 +255,10 @@ def build_needs_pm_section(config, project_label):
 
     section = "## ⚠️ Needs PM Attention\n\n"
     if not items:
-        section += "_No engineering issues currently flagged for PM attention. 🎉_\n"
+        section += f"_No engineering issues currently flagged with both `{project_label}` and `needs-pm`. 🎉_\n"
         return section
 
-    section += f"_{len(items)} issue(s) tagged `needs-pm` in linked code repos:_\n\n"
+    section += f"_{len(items)} issue(s) tagged `needs-pm` AND `{project_label}` in linked code repos:_\n\n"
     section += "| Repo | # | Title | Filed by | Age |\n"
     section += "|---|---|---|---|---|\n"
     for repo, issue in items[:20]:
