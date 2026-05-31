@@ -1,0 +1,47 @@
+name: 🧪 Seed test scenario
+
+# Populates a linked engineering repo with realistic test data so the
+# PMO dashboard's cross-repo sections all light up for verification.
+#
+# Run this from the Actions tab, provide the engineering repo + project slug.
+# After it completes, run the Dashboard update workflow and verify the sections
+# against the "EXPECTED DASHBOARD STATE" printed in this workflow's log.
+#
+# To clean up afterward: filter the eng repo's issues by `seed:test-data` label
+# and bulk-close/delete, then delete the Sprint 4/5/6 milestones.
+
+on:
+  workflow_dispatch:
+    inputs:
+      eng_repo:
+        description: "Engineering repo to seed (owner/repo)"
+        required: true
+        default: "PMOTestingOrg/sandbox-backend"
+      project_slug:
+        description: "Project slug (creates project:<slug> label)"
+        required: true
+        default: "pilot-1"
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run seeder
+        env:
+          # Use APP_TOKEN (or PROJECTS_TOKEN) — needs write access to the eng repo
+          SEED_TOKEN: ${{ secrets.APP_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          ENG_REPO: ${{ github.event.inputs.eng_repo }}
+          PROJECT_SLUG: ${{ github.event.inputs.project_slug }}
+        run: python3 scripts/seed_test_scenario.py
