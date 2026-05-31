@@ -241,33 +241,83 @@ def build_engineering_rollup_section(config, project_label):
 
 
 def build_needs_pm_section(config, project_label):
-    """Issues tagged needs-pm AND project label across linked repos."""
+    """Issues tagged needs-pm in linked repos.
+    Surfaces ALL needs-pm issues, marking those missing the project label
+    so PMs notice them even if engineering forgot the project tag.
+    """
     linked = config.get("linked_repos") or []
     if not linked:
         return ""
 
-    items = []
+    project_items = []   # has both needs-pm AND project:slug
+    untagged_items = []  # has needs-pm but NOT project:slug
+
     for repo in linked:
-        data = query_repo_issues(repo, project_label, additional_labels=["needs-pm"],
-                                 states=("OPEN",), limit=20)
-        for issue in data["items"]:
-            items.append((repo, issue))
+        # Get ALL open issues with needs-pm in this repo (regardless of project label)
+        owner, name = repo.split("/", 1)
+        query = """
+        query($owner: String!, $name: String!) {
+          repository(owner: $owner, name: $name) {
+            issues(first: 50, labels: ["needs-pm"], states: [OPEN],
+                   orderBy: {field: UPDATED_AT, direction: DESC}) {
+              nodes {
+                number title state url createdAt updatedAt
+                author { login }
+                labels(first: 20) { nodes { name } }
+              }
+            }
+          }
+        }
+        """
+        try:
+            result = graphql(query, {"owner": owner, "name": name})
+            issues = (result.get("repository") or {}).get("issues", {}).get("nodes", [])
+        except Exception as exc:
+            print(f"  Error querying needs-pm in {repo}: {exc}")
+            continue
+
+        for issue in issues:
+            issue_labels = {l["name"] for l in (issue.get("labels") or {}).get("nodes", [])}
+            if project_label in issue_labels:
+                project_items.append((repo, issue))
+            else:
+                # has needs-pm but not this project's label
+                # only flag if no OTHER project label either (otherwise it's another project's concern)
+                has_any_project_label = any(l.startswith("project:") and l != "project:none"
+                                            for l in issue_labels)
+                if not has_any_project_label:
+                    untagged_items.append((repo, issue))
 
     section = "## ⚠️ Needs PM Attention\n\n"
-    if not items:
-        section += f"_No engineering issues currently flagged with both `{project_label}` and `needs-pm`. 🎉_\n"
+
+    if not project_items and not untagged_items:
+        section += f"_No engineering issues currently flagged `needs-pm` in linked repos. 🎉_\n"
         return section
 
-    section += f"_{len(items)} issue(s) tagged `needs-pm` AND `{project_label}` in linked code repos:_\n\n"
-    section += "| Repo | # | Title | Filed by | Age |\n"
-    section += "|---|---|---|---|---|\n"
-    for repo, issue in items[:20]:
-        title = issue["title"].replace("|", "\\|")
-        if len(title) > 60:
-            title = title[:57] + "..."
-        author = (issue.get("author") or {}).get("login", "?")
-        section += (f"| `{repo}` | [#{issue['number']}]({issue['url']}) | "
-                    f"{title} | @{author} | {time_ago(issue.get('createdAt'))} |\n")
+    if project_items:
+        section += f"### Tagged with `{project_label}` ({len(project_items)})\n\n"
+        section += "| Repo | # | Title | Filed by | Age |\n|---|---|---|---|---|\n"
+        for repo, issue in project_items[:20]:
+            title = issue["title"].replace("|", "\\|")
+            if len(title) > 60:
+                title = title[:57] + "..."
+            author = (issue.get("author") or {}).get("login", "?")
+            section += (f"| `{repo}` | [#{issue['number']}]({issue['url']}) | "
+                        f"{title} | @{author} | {time_ago(issue.get('createdAt'))} |\n")
+        section += "\n"
+
+    if untagged_items:
+        section += f"### ⚠️ Has `needs-pm` but missing project label ({len(untagged_items)})\n\n"
+        section += f"_These may belong to this project but engineering didn't apply a `project:*` label. Please review and label appropriately._\n\n"
+        section += "| Repo | # | Title | Filed by | Age |\n|---|---|---|---|---|\n"
+        for repo, issue in untagged_items[:20]:
+            title = issue["title"].replace("|", "\\|")
+            if len(title) > 60:
+                title = title[:57] + "..."
+            author = (issue.get("author") or {}).get("login", "?")
+            section += (f"| `{repo}` | [#{issue['number']}]({issue['url']}) | "
+                        f"{title} | @{author} | {time_ago(issue.get('createdAt'))} |\n")
+
     return section
 
 
