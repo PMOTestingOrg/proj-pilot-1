@@ -176,6 +176,10 @@ def extract_fields(item):
 def get_phase_parents_with_subissues():
     """Use GraphQL to get phase parent issues with their native sub-issues.
     Returns dict: phase_name -> {parent_issue, sub_issues: [{number, state, title}]}
+
+    Note: GraphQL Issue.state returns enum 'OPEN'/'CLOSED' (uppercase). The rest
+    of the codebase uses lowercase 'open'/'closed' (REST convention). We normalize
+    here so all downstream comparisons work consistently.
     """
     owner, name = REPO.split("/")
     query = """
@@ -197,6 +201,11 @@ def get_phase_parents_with_subissues():
         out = {}
         for parent in result["repository"]["issues"]["nodes"]:
             title = parent["title"]
+            # Normalize parent state to lowercase
+            parent["state"] = (parent.get("state") or "").lower()
+            # Normalize sub-issue states to lowercase too
+            for sub in parent["subIssues"]["nodes"]:
+                sub["state"] = (sub.get("state") or "").lower()
             # Match the canonical phase name
             for phase in PHASES:
                 if title.startswith(phase) or title == phase:
