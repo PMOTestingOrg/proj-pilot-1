@@ -370,7 +370,7 @@ def build_status_overview_v2(project, phase_data):
     return section
 
 
-def build_currently_in_section(phase_data, current_phases, phase_statuses):
+def build_currently_in_section(phase_data, current_phases, phase_statuses, dev_rollup=None):
     """Show all in-progress phases. current_phases is a list."""
     section = "## 📍 Currently In\n\n"
     if not current_phases:
@@ -389,6 +389,20 @@ def build_currently_in_section(phase_data, current_phases, phase_statuses):
 
         section += (f"**{phase}** — [#{parent['number']}]"
                     f"(https://github.com/{REPO}/issues/{parent['number']})\n")
+
+        # Development phase: show engineering rollup instead of PMO sub-tasks
+        if phase == "3. Development" and dev_rollup is not None:
+            eng_total = dev_rollup["total"]
+            eng_closed = dev_rollup["closed"]
+            if eng_total > 0:
+                eng_pct = round(100 * eng_closed / eng_total)
+                section += f"- Engineering issues: {eng_closed}/{eng_total} closed ({eng_pct}%)\n"
+                section += f"- Open engineering issues: {dev_rollup['open']}\n"
+            else:
+                section += "- No engineering issues tagged for this project yet\n"
+            section += "\n"
+            continue
+
         if board_status:
             section += f"- Status: {board_status}\n"
         if board_pct is not None:
@@ -402,9 +416,9 @@ def build_currently_in_section(phase_data, current_phases, phase_statuses):
     return section
 
 
-def build_phase_progress_section(phase_data, project, phase_statuses):
+def build_phase_progress_section(phase_data, project, phase_statuses, dev_rollup=None):
     section = "## 📊 Phase Progress\n\n"
-    section += "| Phase | Status | Progress | Sub-issues | Earliest Planned End |\n"
+    section += "| Phase | Status | Progress | Work Items | Earliest Planned End |\n"
     section += "|---|---|---|---|---|\n"
     today = datetime.now(timezone.utc).date()
 
@@ -439,6 +453,51 @@ def build_phase_progress_section(phase_data, project, phase_statuses):
         board_data = phase_statuses.get(phase) or {}
         board_status = board_data.get("status", "")
         board_pct = board_data.get("pct_complete")
+
+        end_str = phase_earliest_end.get(phase, "—")
+        variance = ""
+        if end_str != "—":
+            try:
+                pe = datetime.fromisoformat(end_str).date()
+                if today > pe and parent["state"] != "closed":
+                    variance = f" ⚠️ +{(today - pe).days}d"
+            except Exception:
+                pass
+
+        # ─── SPECIAL CASE: Development phase is driven by engineering issues ───
+        if phase == "3. Development" and dev_rollup is not None:
+            eng_total = dev_rollup["total"]
+            eng_closed = dev_rollup["closed"]
+            eng_open = dev_rollup["open"]
+
+            # Status from engineering work, unless PM closed the parent or set board status
+            if parent["state"] == "closed":
+                dev_status = "✅ Done"
+            elif board_status and "Done" in board_status:
+                dev_status = "✅ " + board_status
+            elif board_status and "Blocked" in board_status:
+                dev_status = "🚫 " + board_status
+            elif eng_total == 0:
+                dev_status = "⏳ Not Started"
+            elif eng_closed == eng_total:
+                dev_status = "✅ All eng issues closed"
+            elif eng_closed > 0 or eng_open > 0:
+                dev_status = "🔄 In Progress"
+            else:
+                dev_status = "⏳ Not Started"
+
+            if eng_total > 0:
+                dev_pct = round(100 * eng_closed / eng_total)
+                dev_progress = f"{dev_pct}%"
+                dev_work = f"{eng_closed}/{eng_total} eng issues"
+            else:
+                dev_progress = "—"
+                dev_work = "0 eng issues"
+
+            section += (f"| {phase} _(from engineering)_ | {dev_status} | "
+                        f"{dev_progress} | {dev_work} | {end_str}{variance} |\n")
+            continue
+        # ─── END special case ───
 
         # Status: prefer board status when set, else infer from issue state
         if parent["state"] == "closed":
@@ -476,23 +535,15 @@ def build_phase_progress_section(phase_data, project, phase_statuses):
         else:
             progress_str = "—"
 
-        # Sub-issues column
+        # Work Items column (PMO sub-issues)
         if total > 0:
             sub_str = f"{done}/{total}"
         else:
             sub_str = "—"
 
-        end_str = phase_earliest_end.get(phase, "—")
-        variance = ""
-        if end_str != "—":
-            try:
-                pe = datetime.fromisoformat(end_str).date()
-                if today > pe and parent["state"] != "closed":
-                    variance = f" ⚠️ +{(today - pe).days}d"
-            except Exception:
-                pass
-
         section += f"| {phase} | {status_icon} | {progress_str} | {sub_str} | {end_str}{variance} |\n"
+
+    section += "\n_Development progress reflects engineering issues (labeled for this project) in the linked code repos. Other phases reflect PMO sub-issues._\n"
     return section
 
 
@@ -707,6 +758,15 @@ def main():
     # Legacy single-phase value for pin manager
     current_phase = current_phases[0] if current_phases else None
 
+    # NEW: engineering rollup for the Development phase (counts project-labeled
+    # issues across linked code repos). None if no config / no linked repos.
+    dev_rollup = None
+    try:
+        from refresh_cross_repo import get_development_rollup
+        dev_rollup = get_development_rollup()
+    except Exception as exc:
+        print(f"Development rollup skipped: {exc}")
+
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     body = "# 📈 Project Dashboard\n\n"
     body += f"> **Last refreshed:** {now}\n"
@@ -726,9 +786,9 @@ def main():
     body += f"- 📊 [Weekly Status Reports]({base}?q=is%3Aissue+label%3Atype%3Astatus-report)\n\n"
 
     body += build_health_section(phase_data, milestones, project, issues) + "\n"
-    body += build_currently_in_section(phase_data, current_phases, phase_statuses) + "\n"
+    body += build_currently_in_section(phase_data, current_phases, phase_statuses, dev_rollup) + "\n"
     body += build_status_overview_v2(project, phase_data) + "\n"
-    body += build_phase_progress_section(phase_data, project, phase_statuses) + "\n"
+    body += build_phase_progress_section(phase_data, project, phase_statuses, dev_rollup) + "\n"
     body += build_invoice_section(milestones) + "\n"
 
     # ─── Cross-repo sections (if project-config.yml is set up) ───
