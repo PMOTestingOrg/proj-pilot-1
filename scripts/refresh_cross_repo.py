@@ -405,7 +405,11 @@ def build_sprint_status_section(config):
             section += f"| `{repo}` | [{title}]({m['html_url']}) | {progress} | {due_str} |\n"
 
     if not any_found:
-        section = "## 🏃 Engineering Sprint Status\n\n_No open milestones in any linked repo._\n"
+        section = ("## 🏃 Engineering Sprint Status\n\n"
+                   "⚠️ **No sprints (milestones) created yet** in any linked engineering repo.\n\n"
+                   "_Engineering tracks sprints as GitHub Milestones. Once they create one and "
+                   "assign issues to it, sprint progress will appear here. If the team is actively "
+                   "working but no sprint shows, ask them to set up a milestone for the current sprint._\n")
     return section
 
 
@@ -494,6 +498,50 @@ def build_invoice_triggers_section(config):
 
 
 # ─── Top-level function called by update_dashboard.py ──────────
+def get_development_rollup(config=None, project_label=None):
+    """Aggregate engineering issue counts for the Development phase.
+
+    Counts issues labeled with the project label across all linked code repos.
+    Returns dict: {open, closed, total, by_repo: {repo: {open, closed}}}.
+    Returns None if no config / no project label / no linked repos.
+
+    This is what feeds the Development phase row in the PMO dashboard's
+    Phase Progress table — so "Development" reflects real engineering work
+    instead of PMO sub-issues.
+    """
+    if config is None:
+        config = load_config()
+    if not config:
+        return None
+    if project_label is None:
+        project_label = get_project_label(config)
+    if not project_label:
+        return None
+
+    linked = config.get("linked_repos") or []
+    if not linked:
+        return None
+
+    total_open = 0
+    total_closed = 0
+    by_repo = {}
+    for repo in linked:
+        open_data = query_repo_issues(repo, project_label, states=("OPEN",), limit=100)
+        closed_data = query_repo_issues(repo, project_label, states=("CLOSED",), limit=100)
+        o = open_data.get("total", 0) if not open_data.get("error") else 0
+        c = closed_data.get("total", 0) if not closed_data.get("error") else 0
+        total_open += o
+        total_closed += c
+        by_repo[repo] = {"open": o, "closed": c, "error": open_data.get("error")}
+
+    return {
+        "open": total_open,
+        "closed": total_closed,
+        "total": total_open + total_closed,
+        "by_repo": by_repo,
+    }
+
+
 def build_cross_repo_sections():
     """Returns dict: section_name -> markdown_string. Empty dict if no config."""
     config = load_config()
