@@ -15,3 +15,4 @@ Weekly snapshot of overall project health. New row appended every Monday.
 | 2026-W29 | 2026-07-20 | 🔴 Red | 1. Initiation & Planning | P1:1/2 P2:3/5 P3:0/0 P4:0/2 P5:0/4 P6:0/1 | 1 | 0 | 0 | 1 |
 | 2026-W30 | 2026-07-27 | 🔴 Red | 1. Initiation & Planning | P1:1/2 P2:3/5 P3:0/0 P4:0/2 P5:0/4 P6:0/1 | 1 | 0 | 0 | 1 |
 | 2026-W31 | 2026-08-03 | 🔴 Red | 1. Initiation & Planning | P1:1/2 P2:3/5 P3:0/0 P4:0/2 P5:0/4 P6:0/1 | 1 | 0 | 0 | 1 |
+| 2026-W32 | 2026-08-10 | 🔴 Red | 1. Initiation & Planning | P1:1/2 P2:3/5 P3:0/0 P4:0/2 P5:0/4 P6:0/1 | 1 | 0 | 0 | 1 |
